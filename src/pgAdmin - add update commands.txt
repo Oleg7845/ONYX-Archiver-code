@@ -1,0 +1,76 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+DO $$
+DECLARE
+    -- Настройки
+    v_app_name TEXT := 'ONYX Archiver';
+    v_channel_name TEXT := 'stable';
+    v_version TEXT := '1.1.0';
+    v_is_mandatory BOOLEAN := true;
+
+    v_file_name TEXT := 'ONYX_Archiver_version-1.1.0.zip';
+    v_hash TEXT := '8EBEBAE5B40655AC148E37E59040311D5ABEC01E9E0B25BBAFEB93E7859E218A9BD02342823B5B432957951F9354811E8E7D2C8C0FF9AF0D137E6F85CC7B2998';
+    v_signature TEXT := 'UFX+ttZyK8/cHcBbQ3nhkURS3JTOvkD5u7oEnQrwpOXe9F1oM0IhqrdDTPuq4bsUsofwBnSHuiVNK6kRiWHKBw==';
+    v_size BIGINT := 81271847;
+
+    -- Переменные для Id
+    v_app_id UUID;
+    v_channel_id UUID;
+    v_release_id UUID;
+BEGIN
+
+-- ====== APPLICATION ======
+SELECT "Id" INTO v_app_id
+FROM "Applications"
+WHERE "Name" = v_app_name
+LIMIT 1;
+
+IF v_app_id IS NULL THEN
+    INSERT INTO "Applications" ("Id", "Name", "CreatedAt")
+    VALUES (gen_random_uuid(), v_app_name, NOW())
+    RETURNING "Id" INTO v_app_id;
+END IF;
+
+-- ====== CHANNEL ======
+SELECT "Id" INTO v_channel_id
+FROM "Channels"
+WHERE "Name" = v_channel_name AND "ApplicationId" = v_app_id
+LIMIT 1;
+
+IF v_channel_id IS NULL THEN
+    INSERT INTO "Channels" ("Id", "Name", "ApplicationId")
+    VALUES (gen_random_uuid(), v_channel_name, v_app_id)
+    RETURNING "Id" INTO v_channel_id;
+END IF;
+
+SELECT "Id" INTO v_release_id
+FROM "Releases"
+WHERE "Version" = v_version AND "ChannelId" = v_channel_id
+LIMIT 1;
+
+IF v_release_id IS NULL THEN
+    INSERT INTO "Releases" ("Id", "Version", "IsMandatory", "CreatedAt", "ChannelId")
+    VALUES (
+        gen_random_uuid(),
+        v_version,
+        v_is_mandatory,
+        NOW(),
+        v_channel_id
+    )
+    RETURNING "Id" INTO v_release_id;
+
+    -- ====== FILE ======
+    INSERT INTO "ReleaseFiles"
+    ("Id", "FileName", "Hash", "Signature", "Size", "FileType", "ReleaseId")
+    VALUES (
+        gen_random_uuid(),
+        v_file_name,
+        v_hash,
+        v_signature,
+        v_size,
+        'full',
+        v_release_id
+    );
+END IF;
+
+END $$;
